@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DOPE // Ballistic Engagement Platform</title>
+  <style>
+    :root {
+      --bg-obsidian: #050706; --bg-panel: #0a0f0c; --bg-subtle: #101813;
+      --border: #1a2e20; --border-bright: #2b4f35;
+      --text: #a3c9b1; --text-dim: #5a8066;
+      --neon-green: #39ff14; --dark-green: #1f8a4c;
+      --alert-red: #ff2a2a; --warn-amber: #ffaa00; --gold: #d4af37; --cyan: #00f3ff;
+      --font-mono: "SF Mono", "Consolas", "Roboto Mono", "Fira Code", monospace;
+    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+    body { background: var(--bg-obsidian); color: var(--text); font-family: var(--font-mono); font-size: 12px; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: rgba(5, 7, 6, 0.95); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(4px); }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: 2px; color: var(--neon-green); }
+    .nav-tabs { display: flex; gap: 4px; overflow-x: auto; }
+    .nav-btn { background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.15s ease; white-space: nowrap; }
+    .nav-btn.active, .nav-btn:hover { color: var(--neon-green); border-color: var(--neon-green); background: rgba(57, 255, 20, 0.08); }
+    .nav-btn.godmode-active { color: var(--gold); border-color: var(--gold); background: rgba(212, 175, 55, 0.1); }
+    
+    main { flex: 1; display: flex; flex-direction: column; position: relative; }
+    .view-panel { display: none; padding: 16px; flex: 1; }
+    .view-panel.active { display: flex; flex-direction: column; gap: 16px; }
+
+    .grid-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { background: var(--bg-panel); border: 1px solid var(--border); padding: 12px; position: relative; }
+    .card::before { content: ""; position: absolute; top: -1px; left: -1px; width: 6px; height: 6px; border-top: 1px solid var(--neon-green); border-left: 1px solid var(--neon-green); }
+    
+    .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--neon-green); margin-bottom: 12px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .armory-selector { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 4px; }
+    .subtab-btn { background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 4px 8px; font-size: 10px; cursor: pointer; white-space: nowrap; }
+    .subtab-btn.active { border-color: var(--neon-green); color: var(--neon-green); }
+    
+    .item-grid { max-height: 400px; overflow-y: auto; display: grid; gap: 6px; padding-right: 4px; }
+    .item-row { background: var(--bg-subtle); border: 1px solid var(--border); padding: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 11px; }
+    .item-row:hover { border-color: var(--border-bright); }
+    .item-row.equipped { border-color: var(--neon-green); background: rgba(57, 255, 20, 0.05); }
+    
+    .item-rarity-mil { color: var(--text); }
+    .item-rarity-match { color: var(--neon-green); }
+    .item-rarity-black { color: #8a2be2; }
+    .item-rarity-ghost { color: var(--gold); text-shadow: 0 0 4px rgba(212, 175, 55, 0.4); }
+
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; }
+    .stat-val { color: var(--neon-green); font-weight: bold; }
+
+    #engagement-container { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 1100px; margin: 0 auto; }
+    .canvas-hud-wrap { position: relative; width: 100%; aspect-ratio: 16/9; max-height: 580px; background: #020302; border: 1px solid var(--border); overflow: hidden; touch-action: none; }
+    canvas#scopeCanvas { width: 100%; height: 100%; display: block; }
+    
+    .scope-overlay { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; font-size: 11px; color: var(--neon-green); text-shadow: 0 0 3px black; }
+    .hud-block { background: rgba(5, 7, 6, 0.75); border: 1px solid var(--border); padding: 6px 10px; }
+    .alert-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--neon-green); margin-right: 6px; box-shadow: 0 0 6px var(--neon-green); }
+    .alert-indicator.yellow { background: var(--warn-amber); box-shadow: 0 0 6px var(--warn-amber); }
+    .alert-indicator.orange { background: #ff7700; box-shadow: 0 0 6px #ff7700; }
+    .alert-indicator.red { background: var(--alert-red); box-shadow: 0 0 8px var(--alert-red); animation: pulse 0.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+    .tactical-controls { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; justify-content: center; }
+    .action-btn { background: var(--bg-panel); border: 1px solid var(--neon-green); color: var(--neon-green); font-family: var(--font-mono); font-size: 12px; font-weight: 700; padding: 10px 18px; cursor: pointer; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.1s; }
+    .action-btn:active { background: var(--neon-green); color: var(--bg-obsidian); }
+    .action-btn.fire-btn { border-color: var(--alert-red); color: var(--alert-red); }
+    .action-btn.fire-btn:active { background: var(--alert-red); color: #fff; }
+    .action-btn.holding-breath { background: rgba(57, 255, 20, 0.25); border-color: #fff; color: #fff; }
+
+    .trajectory-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 8px; }
+    @media (max-width: 768px) { .trajectory-panel { grid-template-columns: 1fr; } }
+    .telemetry-canvas-wrap { background: var(--bg-panel); border: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .telemetry-canvas-wrap canvas { width: 100%; height: 140px; background: #030403; border: 1px solid var(--border); }
+
+    .skill-branch { display: flex; flex-direction: column; gap: 8px; }
+    .skill-node { background: var(--bg-subtle); border: 1px solid var(--border); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .skill-node.unlocked { border-color: var(--neon-green); background: rgba(57, 255, 20, 0.05); }
+    .skill-node.maxed { border-color: var(--gold); }
+    .skill-node:hover:not(.maxed) { border-color: var(--border-bright); }
+    .breath-bar-wrap { width: 100%; height: 6px; background: #0a0f0c; border: 1px solid var(--border); position: relative; margin-top: 4px; }
+    .breath-bar-fill { height: 100%; width: 100%; background: var(--neon-green); transition: width 0.1s linear; }
+    .terminal-log { font-size: 10px; line-height: 1.5; color: var(--neon-green); background: #020302; border: 1px solid var(--border); padding: 8px; height: 120px; overflow-y: auto; text-shadow: 0 0 2px rgba(57,255,20,0.5); }
+    .terminal-log span.system { color: var(--text-dim); }
+    .terminal-log span.alert { color: var(--alert-red); }
+    .terminal-log span.warn { color: var(--warn-amber); }
+    .terminal-log span.gold { color: var(--gold); }
+    .terminal-log span.cyan { color: var(--cyan); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand"><span>SHADOW_NET // BALLISTIC OS</span></div>
+    <div class="nav-tabs">
+      <button class="nav-btn active" onclick="Engine.setPhase('HQ')">HQ Armory</button>
+      <button class="nav-btn" onclick="Engine.setPhase('SPOTTER')">Spotter Cell</button>
+      <button class="nav-btn" onclick="Engine.setPhase('TRAINING')">Proving Grounds</button>
+      <button class="nav-btn" onclick="Engine.setPhase('INTEL')">Intel Board</button>
+      <button class="nav-btn" onclick="Engine.setPhase('SETUP')">Infiltration</button>
+      <button class="nav-btn" onclick="Engine.setPhase('ENGAGEMENT')">Fire Control</button>
+      <button class="nav-btn" onclick="Engine.setPhase('AAR')">AAR</button>
+      <button class="nav-btn" id="godmode-toggle" onclick="Engine.toggleGodMode()">DEV: OMNI</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- PHASE 1: HQ ARMORY -->
+    <section id="view-HQ" class="view-panel active">
+      <div class="grid-layout">
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-title"><span>Weapon Configuration</span><span id="weapon-platform-name" style="color: var(--gold)">Custom Platform</span></div>
+          <div class="armory-selector">
+            <button class="subtab-btn active" onclick="Engine.showArmoryCategory('receiver', this)">Receivers (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('optic', this)">Optics (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('barrel', this)">Barrels (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('trigger', this)">Triggers (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('bolt', this)">Actions (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('ammo', this)">Ammunition (20)</button>
+            <button class="subtab-btn" onclick="Engine.showArmoryCategory('legendary', this)">Warlords (20)</button>
+          </div>
+          <div class="item-grid" id="armory-item-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>Telemetry & Condition</span></div>
+          <div class="stat-row"><span>Muzzle Velocity:</span><span class="stat-val" id="stat-mv">-- FPS</span></div>
+          <div class="stat-row"><span>Ballistic Coef:</span><span class="stat-val" id="stat-bc">-- G1</span></div>
+          <div class="stat-row"><span>Base MOA:</span><span class="stat-val" id="stat-moa">-- MOA</span></div>
+          <div class="stat-row"><span>Assembly Wt:</span><span class="stat-val" id="stat-weight">-- lbs</span></div>
+          <div class="stat-row"><span>Suppression:</span><span class="stat-val" id="stat-sound">-- dB</span></div>
+          <div class="stat-row"><span>Credits:</span><span class="stat-val" id="stat-credits" style="color: var(--gold);">$0</span></div>
+          <div style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px;">
+            <div class="card-title"><span>Condition (Wear/Tear)</span></div>
+            <div class="stat-row"><span>Barrel Durability:</span><span class="stat-val" id="stat-durability">100%</span></div>
+            <div class="stat-row"><span>Fouling Penalty:</span><span class="stat-val" id="stat-fouling">0%</span></div>
+            <button class="subtab-btn" style="width:100%; margin-top:5px;" onclick="Engine.cleanWeapon()">Clean & Restore ($500)</button>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column: span 3;">
+          <div class="card-title"><span>Sniper Skill Pipeline</span><span>Points: <span id="stat-skill-points" style="color:var(--neon-green)">0</span></span></div>
+          <div class="grid-layout" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="skill-branch" id="skills-body"></div>
+            <div class="skill-branch" id="skills-recon"></div>
+            <div class="skill-branch" id="skills-ballistics"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 1.5: SPOTTER CELL -->
+    <section id="view-SPOTTER" class="view-panel">
+      <div class="grid-layout">
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-title"><span>Spotter Equipment Roster</span><span style="color: var(--cyan)">Overwatch Asset</span></div>
+          <div class="armory-selector">
+            <button class="subtab-btn active" onclick="Engine.showSpotterCategory('s_optics', this)">Optics/Binos (20)</button>
+            <button class="subtab-btn" onclick="Engine.showSpotterCategory('s_lrf', this)">LRF Systems (20)</button>
+            <button class="subtab-btn" onclick="Engine.showSpotterCategory('s_thm', this)">Thermals (20)</button>
+            <button class="subtab-btn" onclick="Engine.showSpotterCategory('s_wth', this)">Weather (20)</button>
+            <button class="subtab-btn" onclick="Engine.showSpotterCategory('s_pdw', this)">PDWs (20)</button>
+            <button class="subtab-btn" onclick="Engine.showSpotterCategory('s_drn', this)">Drones (20)</button>
+          </div>
+          <div class="item-grid" id="spotter-item-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Spotter Capabilities</span></div>
+          <div class="stat-row"><span>Wind Cone Reduction:</span><span class="stat-val" id="sp-wind">--%</span></div>
+          <div class="stat-row"><span>Range Accuracy:</span><span class="stat-val" id="sp-rng">--%</span></div>
+          <div class="stat-row"><span>Evasion Defense:</span><span class="stat-val" id="sp-def">--</span></div>
+          <div class="stat-row"><span>Drone Battery:</span><span class="stat-val" id="sp-bat">--m</span></div>
+          <div style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px;">
+            <div class="card-title"><span>Spotter Status</span></div>
+            <div class="stat-row"><span>Asset Deployed:</span><span class="stat-val" id="sp-active" style="color:var(--text-dim)">NO</span></div>
+            <button class="subtab-btn" style="width:100%; border-color:var(--cyan); color:var(--cyan); margin-top:5px;" onclick="Engine.hireSpotter()">Deploy Spotter ($1500)</button>
+          </div>
+        </div>
+        <div class="card" style="grid-column: span 3;">
+          <div class="card-title"><span>Spotter Skill Tree</span><span>Points: <span id="stat-sp-skill-points" style="color:var(--cyan)">0</span></span></div>
+          <div class="grid-layout" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="skill-branch" id="skills-sp-bal"></div>
+            <div class="skill-branch" id="skills-sp-sur"></div>
+            <div class="skill-branch" id="skills-sp-eva"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 2: PROVING GROUNDS / TRAINING -->
+    <section id="view-TRAINING" class="view-panel">
+      <div class="grid-layout">
+        <div class="card">
+          <div class="card-title"><span>Live-Fire Tracking Drills</span></div>
+          <p style="color:var(--text-dim); margin-bottom:16px;">Practice lateral DOPE and lead equations on high-speed mechanized drone targets. Wind and atmospheric conditions are randomized per deployment.</p>
+          <div class="stat-row"><span>Target Speed:</span><span class="stat-val">12 - 18 m/s</span></div>
+          <div class="stat-row"><span>Payout:</span><span class="stat-val" style="color:var(--gold)">Low ($200)</span></div>
+          <button class="action-btn" style="width:100%; margin-top:12px;" onclick="Engine.setupTrackingDrill()">Deploy to Range</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><span style="color:var(--alert-red)">1v1 AI Sniper Duel</span></div>
+          <p style="color:var(--text-dim); margin-bottom:16px;">Face off against a <strong>Vengeance Vanguard</strong> master instructor. Unsuppressed shots, high position heat, and misses will reveal your azimuth, prompting immediate lethal return fire.</p>
+          <div class="stat-row"><span>Target Type:</span><span class="stat-val" style="color:var(--alert-red)">Counter-Sniper</span></div>
+          <div class="stat-row"><span>Payout:</span><span class="stat-val" style="color:var(--gold)">High ($2,500)</span></div>
+          <button class="action-btn" style="width:100%; border-color:var(--alert-red); color:var(--alert-red); margin-top:12px;" onclick="Engine.setupProvingGrounds()">Initiate Duel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 3: INTEL CONTRACTS -->
+    <section id="view-INTEL" class="view-panel">
+      <div class="grid-layout">
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-title">
+            <span>ShadowNet Contract Board</span>
+            <button class="subtab-btn" onclick="Engine.generateContracts()">Refresh Board</button>
+          </div>
+          <div id="intel-contract-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Faction Notoriety</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; font-size:10px;">
+            <div class="stat-row"><span style="color:var(--warn-amber)">Al-Aqmar Brigade:</span> <span id="rep-aqmar">0 (Unnoticed)</span></div>
+            <div class="stat-row"><span style="color:#8a2be2">Black Crescent:</span> <span id="rep-crescent">0 (Unnoticed)</span></div>
+            <div class="stat-row"><span style="color:var(--alert-red)">Vengeance Vanguard:</span> <span id="rep-vanguard">0 (Unnoticed)</span></div>
+            <div class="stat-row"><span style="color:#a3c9b1">Iron Ummah:</span> <span id="rep-ummah">0 (Unnoticed)</span></div>
+            <div class="stat-row"><span style="color:var(--cyan)">Levant Cyber-Front:</span> <span id="rep-cyber">0 (Unnoticed)</span></div>
+          </div>
+          <div class="card-title"><span>Fog-of-War Surveillance</span></div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <button class="action-btn" onclick="Engine.buyIntel('thermal')">Drone Thermal (<span class="intel-cost">$500</span>)</button>
+            <button class="action-btn" onclick="Engine.buyIntel('wind')">Weather Station (<span class="intel-cost">$350</span>)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 4: INFILTRATION SETUP -->
+    <section id="view-SETUP" class="view-panel">
+      <div class="grid-layout">
+        <div class="card">
+          <div class="card-title"><span>Infiltration Route</span></div>
+          <div id="terrain-selection-grid" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Support Platform & Stance</span></div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="item-row" id="stance-prone" onclick="Engine.setStance('prone')"><div><strong>Prone / Bipod</strong><br><span style="color:var(--text-dim)">Wobble: 1.0x</span></div></div>
+            <div class="item-row" id="stance-kneeling" onclick="Engine.setStance('kneeling')"><div><strong>Kneeling / Barricade</strong><br><span style="color:var(--text-dim)">Wobble: 2.5x</span></div></div>
+            <div class="item-row" id="stance-standing" onclick="Engine.setStance('standing')"><div><strong>Standing Unsupported</strong><br><span style="color:var(--text-dim)">Wobble: 5.0x</span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Biometric Insertion Simulation</span></div>
+          <div class="stat-row"><span>Gross Pack Weight:</span><span class="stat-val" id="setup-pack-weight">--</span></div>
+          <div class="stat-row"><span>Starting Heart Rate:</span><span class="stat-val" id="setup-est-bpm" style="color:var(--alert-red)">-- BPM</span></div>
+          <button class="action-btn" style="width:100%; margin-top:16px;" onclick="Engine.confirmInfiltration()">Deploy To Zone</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PHASE 5: ENGAGEMENT -->
+    <section id="view-ENGAGEMENT" class="view-panel">
+      <div id="engagement-container">
+        <div class="canvas-hud-wrap" id="canvas-wrapper">
+          <canvas id="scopeCanvas" width="960" height="540"></canvas>
+          <div class="scope-overlay">
+            <div class="hud-block">
+              <div>RANGE: <span id="hud-range" style="color:#fff; font-weight:bold;">--</span></div>
+              <div>ELEV DEF: <span id="hud-dope-elev" style="color:var(--neon-green);">--</span></div>
+              <div>WIND DRIFT: <span id="hud-dope-wind" style="color:var(--neon-green);">--</span></div>
+              <div>AIR DENS: <span id="hud-density" style="color:var(--cyan);">--</span></div>
+              <div>TARGET TYPE: <span id="hud-type" style="color:var(--cyan);">--</span></div>
+            </div>
+            <div class="hud-block" style="text-align: right;">
+              <div>ALERT: <span class="alert-indicator" id="hud-alert-indicator"></span><span id="hud-alert-text">GREEN</span></div>
+              <div>HEAT: <span id="hud-heat-val">0%</span></div>
+              <div>WIND: <span id="hud-wind" style="color:#fff;">--</span></div>
+              <div>STANCE: <span id="hud-stance-display">--</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="width:100%; max-width:960px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div>PULSE: <span id="hud-bpm" style="color:var(--alert-red); font-size:14px; font-weight:bold;">-- BPM</span></div>
+            <div style="width:140px;"><div style="font-size:9px; color:var(--text-dim);">LUNG CAPACITY</div><div class="breath-bar-wrap"><div class="breath-bar-fill" id="hud-breath-bar"></div></div></div>
+          </div>
+          <div>MAGNIFICATION: <span id="hud-mag" style="color:var(--neon-green); font-weight:bold;">--</span></div>
+        </div>
+
+        <div class="tactical-controls">
+          <button class="action-btn" id="btn-breath" onmousedown="Engine.startBreathHold()" onmouseup="Engine.releaseBreathHold()" ontouchstart="Engine.startBreathHold()" ontouchend="Engine.releaseBreathHold()">HOLD BREATH [SPACE]</button>
+          <button class="action-btn" onclick="Engine.cycleZoom(-2)">ZOOM -</button>
+          <button class="action-btn" onclick="Engine.cycleZoom(2)">ZOOM +</button>
+          <button class="action-btn" onclick="Engine.toggleThermal()">OPTIC FILTER</button>
+          <button class="action-btn fire-btn" onclick="Engine.triggerShot()">DISCHARGE [CLICK]</button>
+        </div>
+
+        <div class="trajectory-panel">
+          <div class="telemetry-canvas-wrap"><div style="display:flex; justify-content:space-between; font-size:10px;"><span style="color:var(--neon-green)">SIDE ELEVATION DROP</span><span id="telemetry-drop-val">--</span></div><canvas id="sideCanvas" width="450" height="130"></canvas></div>
+          <div class="telemetry-canvas-wrap"><div style="display:flex; justify-content:space-between; font-size:10px;"><span style="color:var(--warn-amber)">WIND DRIFT (TOP-DOWN)</span><span id="telemetry-drift-val">--</span></div><canvas id="topCanvas" width="450" height="130"></canvas></div>
+        </div>
+        
+        <div style="width:100%; max-width:960px;"><div class="terminal-log" id="engagement-log"></div></div>
+      </div>
+    </section>
+
+    <!-- PHASE 6: AAR -->
+    <section id="view-AAR" class="view-panel">
+      <div class="grid-layout">
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-title"><span>Terminal Telemetry</span><span id="aar-outcome" style="color:var(--neon-green)">--</span></div>
+          <div class="stat-row"><span>Target Engagement Range:</span><span class="stat-val" id="aar-range">--</span></div>
+          <div class="stat-row"><span>Flight Time (ToF):</span><span class="stat-val" id="aar-tof">--</span></div>
+          <div class="stat-row"><span>Terminal Velocity:</span><span class="stat-val" id="aar-impact-vel">--</span></div>
+          <div class="stat-row"><span>Kinetic Energy (Impact):</span><span class="stat-val" id="aar-energy">--</span></div>
+          <div class="stat-row"><span>Cover/Armor Penetration:</span><span class="stat-val" id="aar-cover">--</span></div>
+          <div class="stat-row"><span>Impact Zone:</span><span class="stat-val" id="aar-hitbox" style="color:var(--alert-red)">--</span></div>
+          <div style="margin-top:16px;"><button class="action-btn" onclick="Engine.setPhase('INTEL')">Return to Intel Board</button></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Mission Spoils & Notoriety</span></div>
+          <div class="stat-row"><span>Contract Bounty/Fines:</span><span class="stat-val" id="aar-payout" style="color:var(--gold)">--</span></div>
+          <div class="stat-row"><span>Faction Rep Shift:</span><span class="stat-val" id="aar-rep" style="color:var(--alert-red)">--</span></div>
+          <div class="stat-row"><span>Sniper SP:</span><span class="stat-val" id="aar-xp" style="color:var(--neon-green)">--</span></div>
+          <div class="stat-row"><span>Spotter SP:</span><span class="stat-val" id="aar-sp-xp" style="color:var(--cyan)">--</span></div>
+          <div id="aar-exfil-log" style="margin-top:10px; font-size:10px; color:var(--text-dim); border-top:1px solid var(--border); padding-top:5px;"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  var Engine = null;
+
+  /* =========================================================================
+     FACTIONS & DATABASE
+     ========================================================================= */
+  const FACTIONS = {
+    aqmar: { id: "aqmar", n: "Al-Aqmar Brigade", types: ["infantry", "hostage"], leaders: ["Tariq Al-Hassan", "Sheikh Omar Al-Din", "Qasim Al-Zarqawi"] },
+    crescent: { id: "crescent", n: "Black Crescent Syndicate", types: ["vehicle", "helicopter"], leaders: ["Viktor Vance", "Malik Al-Sabah", "Rashid Al-Farsi"] },
+    vanguard: { id: "vanguard", n: "Vengeance Vanguard", types: ["infantry", "duel"], leaders: ["Dr. Ziyad Al-Khatib", "Faris Al-Tamimi", "Youssef Al-Masri"] },
+    ummah: { id: "ummah", n: "Iron Ummah", types: ["vehicle", "infantry"], leaders: ["Commander Khaled Al-Assad", "Bassam Al-Bakri", "Ibrahim Al-Shehab"] },
+    cyber: { id: "cyber", n: "Levant Cyber-Front", types: ["hostage", "helicopter"], leaders: ["Hani Al-Jamil", "Dr. Nadia Al-Suleiman", "Zaki 'Cipher' Al-Din"] }
+  };
+
+  const genItems = (prefix, nameArr, valKey, valMult, costBase, tierArr) => {
+    let arr = [];
+    for(let i=0; i<20; i++) {
+      let tier = tierArr[i%tierArr.length];
+      let obj = { id: prefix + i, name: nameArr[i%nameArr.length] + " Mk" + (i+1), c: costBase + (i*150), tier: tier };
+      obj[valKey] = valMult + (i * (valMult*0.1));
+      if(prefix==='r') { obj.moa = Math.max(0.2, 1.5 - (i*0.05)); obj.wt = 7 + (i*0.5); obj.heat = 1.0; }
+      if(prefix==='o') { obj.mag = 10 + (i*2); obj.thm = i%3===0; obj.nv = i%4===0; obj.wt = 1.5 + (i*0.1); }
+      if(prefix==='b') { obj.mv = 50 * i; obj.moa = -0.01 * i; obj.wear = Math.max(0.1, 1.5 - (i*0.05)); obj.wt = 2 + (i*0.3); }
+      if(prefix==='t') { obj.pull = Math.max(0.01, 4.0 - (i*0.2)); obj.wob = Math.max(0.2, 1.0 - (i*0.04)); }
+      if(prefix==='bl') { obj.cyc = Math.max(0.2, 1.2 - (i*0.05)); obj.lock = 2.0; }
+      if(prefix==='a') { obj.bc = 0.4 + (i*0.03); obj.gr = 150 + (i*10); obj.mv = 2600 + (i*50); obj.pF = 1.0 + (i*0.1); }
+      if(prefix==='so') { obj.coneRed = 5 + i; } 
+      if(prefix==='sl') { obj.rngAcc = 50 + (i*2.5); } 
+      if(prefix==='st') { obj.thmRes = i; } 
+      if(prefix==='sw') { obj.wthAcc = 50 + (i*2.5); } 
+      if(prefix==='sp') { obj.def = 10 + (i*2); } 
+      if(prefix==='sd') { obj.bat = 10 + (i*2); } 
+      arr.push(obj);
+    }
+    return arr;
+  };
+
+  const tiers = ["mil", "match", "black", "ghost"];
+  const DB = {
+    receivers: genItems('r', ["Remington 700", "AI AXMC", "CheyTac M200", "McMillan TAC", "Desert Tech"], 'moa', 1.0, 800, tiers),
+    optics: genItems('o', ["DARPA LiDAR", "Chronos Thermal", "Micro-HUD", "Digital FC", "Nightforce"], 'mag', 10, 1000, tiers),
+    barrels: genItems('b', ["Carbon Bull", "Liquid Cryo", "Integral Supp", "Fluted Micro", "Heavy Bull"], 'mv', 50, 900, tiers),
+    triggers: genItems('t', ["Bio Solenoid", "TriggerTech", "Geissele", "Double-Set", "Match Target"], 'pull', 2.0, 300, tiers),
+    bolts: genItems('bl', ["Defiance", "Borden", "DLC Lube", "Straight-Pull", "Titanium"], 'cyc', 1.0, 800, tiers),
+    ammos: genItems('a', ["DU Sabots", "Raufoss HE", "Sierra Match", "SLAP Tungsten", "Subsonic"], 'bc', 0.5, 100, tiers),
+    legendary: [{ id: "w20", name: "X-99 Caseless Ghost", p: "OMNIPOTENT.", r: "r19", o: "o19", b: "b19", t: "t19", c: 150000 }],
+    
+    s_optics: genItems('so', ["Surplus Binos", "Vortex Spotter", "Leica Geovid", "Swarovski BTX", "Quantum Array"], 'coneRed', 5, 200, tiers),
+    s_lrf: genItems('sl', ["Basic Laser", "Sig KILO", "Vectronix PLRF", "Safran JIM", "LiDAR Emitter"], 'rngAcc', 50, 400, tiers),
+    s_thm: genItems('st', ["FLIR Scout", "Pulsar Axion", "Trijicon IR", "BAE SkeetIR", "Mil-Spec Cooled"], 'thmRes', 1, 800, tiers),
+    s_wth: genItems('sw', ["Wind Flag", "Basic Anemometer", "Kestrel 5700", "Doppler Radar", "Atmo-Lidar"], 'wthAcc', 50, 300, tiers),
+    s_pdw: genItems('sp', ["Glock 19", "MP7A1", "P90", "Honey Badger", "B&T APC9K"], 'def', 10, 600, tiers),
+    s_drn: genItems('sd', ["DJI Mavic", "Black Hornet", "Puma AE", "Switchblade", "Predator Micro"], 'bat', 10, 1000, tiers),
+
+    skills: {
+      body: [ { id: "s_hauler", n: "Heavy Hauler", max: 3, d: "-Weapon wt pulse limit." }, { id: "s_lactic", n: "Lactic Buffer", max: 3, d: "Reduces wobble." } ],
+      recon: [ { id: "s_ghost", n: "Ghost Index", max: 3, d: "Reduces heat." }, { id: "s_acoustic", n: "Acoustic Mask", max: 3, d: "Reduces dB footprint." } ],
+      ballistics: [ { id: "s_wind", n: "Intuitive Wind", max: 3, d: "Narrows wind predict." }, { id: "s_anatomy", n: "Anatomy Recog", max: 3, d: "Highlights vitals." } ],
+      sp_bal: [ { id: "sp_cal", n: "Splash Adjust", max: 3, d: "Fast follow-up callouts." }, { id: "sp_rng", n: "True Range", max: 3, d: "Perfect distance math." } ],
+      sp_sur: [ { id: "sp_drone", n: "Drone Loiter", max: 3, d: "Extends battery life." }, { id: "sp_thm", n: "Heat Signature", max: 3, d: "Spots through light cover." } ],
+      sp_eva: [ { id: "sp_cqc", n: "PDW Mastery", max: 3, d: "Boosts exfil survival." }, { id: "sp_ghillie", n: "Camouflage", max: 3, d: "Delays spotter detection." } ]
+    },
+    terrains: [
+      { id: "gorge", n: "Wind-Shear Gorge", diff: 1.4, desc: "High wind turbulence." }, { id: "treeline", n: "Alpine Treeline", diff: 0.8, desc: "Dense concealment." }, { id: "urban", n: "Urban Ruins", diff: 1.1, desc: "Concrete barriers." }
+    ],
+    coverTypes: { "None": 0, "Glass": 200, "SheetMetal": 800, "Concrete": 4500 }
+  };
+
+  /* =========================================================================
+     AUDIO SYNTHESIZER
+     ========================================================================= */
+  class SoundFX {
+    constructor() { this.ctx = null; }
+    init() { 
+      try {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
+        if (this.ctx.state === "suspended") this.ctx.resume(); 
+      } catch(e) {}
+    }
+    playTone(f, type, dur, vol) {
+      try {
+        this.init(); 
+        if(!this.ctx) return;
+        const now = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.type = type; osc.frequency.setValueAtTime(f, now); gain.gain.setValueAtTime(vol, now); gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now + dur + 0.1);
+      } catch(e){}
+    }
+    playShot(isSupp) {
+      try {
+        this.init(); 
+        if(!this.ctx) return;
+        this.playTone(isSupp ? 90 : 150, "sine", isSupp ? 0.3 : 0.6, isSupp ? 0.4 : 1.0);
+        const bSize = this.ctx.sampleRate * (isSupp ? 0.08 : 0.35), b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate), data = b.getChannelData(0);
+        for (let i=0; i<bSize; i++) data[i] = (Math.random()*2-1) * Math.exp(-i/(bSize*(isSupp?0.15:0.3)));
+        const noise = this.ctx.createBufferSource(); noise.buffer = b;
+        const filter = this.ctx.createBiquadFilter(); filter.type = isSupp ? "lowpass" : "bandpass"; filter.frequency.value = isSupp ? 800 : 2200;
+        noise.connect(filter); filter.connect(this.ctx.destination); noise.start(this.ctx.currentTime);
+      } catch(e){}
+    }
+    playClick() { this.playTone(1400, "triangle", 0.05, 0.08); }
+    playHeartbeat() { this.playTone(65, "sine", 0.15, 0.2); }
+  }
+
+  /* =========================================================================
+     MASTER ENGINE
+     ========================================================================= */
+  class TacticalEngine {
+    constructor() {
+      this.audio = new SoundFX(); this.phase = "HQ"; this.godMode = false; this.lastFrame = performance.now();
+      this.player = {
+        credits: 25000, skillPoints: 5, spSkillPoints: 3,
+        skills: { s_hauler:0, s_lactic:0, s_ghost:0, s_acoustic:0, s_wind:0, s_anatomy:0, sp_cal:0, sp_rng:0, sp_drone:0, sp_thm:0, sp_cqc:0, sp_ghillie:0 },
+        eq: { receiver:"r0", optic:"o0", barrel:"b0", trigger:"t0", bolt:"bl0", ammo:"a0", leg:null },
+        spEq: { s_optics:"so0", s_lrf:"sl0", s_thm:"st0", s_wth:"sw0", s_pdw:"sp0", s_drn:"sd0" },
+        condition: { durability: 100.0, fouling: 0.0 },
+        rep: { aqmar: 0, crescent: 0, vanguard: 0, ummah: 0, cyber: 0 },
+        spotterActive: false
+      };
+      this.mission = null; this.stance = "prone"; this.terrain = DB.terrains[0]; this.thermalActive = false; this.zoom = 10.0;
+      this.bpm = 72; this.breath = 1.0; this.holdingBreath = false; this.heat = 0.0; this.alert = "green";
+      this.reticle = { x:0, y:0 }; this.target = { x:0, y:0, w:32, h:75, vx: 0 }; this.bullet = null; 
+      this.spotterState = { timer: 0, calloutQueue: [] };
+    }
+
+    init() {
+      try {
+        this.load(); this.initCanvas(); this.bindInputs(); this.renderArmory("receiver", null); this.renderSpotterArmory("s_optics", null); this.renderSkills();
+        this.generateContracts(); this.renderSetup(); this.updateStats(); this.setPhase("HQ");
+        requestAnimationFrame(t => this.loop(t));
+      } catch(e) {
+        alert("CRITICAL INIT ERROR: " + e.message);
+      }
+    }
+
+    save() { try { localStorage.setItem("SHADOWNET_V8", JSON.stringify(this.player)); } catch(e){} }
+    load() { 
+      try { 
+        const d = localStorage.getItem("SHADOWNET_V8"); 
+        if(d) { 
+          const parsed = JSON.parse(d);
+          if(parsed && parsed.eq && parsed.spEq) { this.player = Object.assign(this.player, parsed); }
+        } 
+      } catch(e) { console.warn("Save load bypassed."); } 
+    }
+
+    setPhase(p) {
+      this.phase = p; document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(v => v.classList.remove("active")); document.getElementById("view-" + p).classList.add("active");
+      
+      const mapping = { HQ:0, SPOTTER:1, TRAINING:2, INTEL:3, SETUP:4, ENGAGEMENT:5, AAR:6 }; 
+      document.querySelectorAll(".nav-tabs .nav-btn")[mapping[p]].classList.add("active");
+      
+      if(p === "ENGAGEMENT") this.startEngagement(); this.audio.playClick();
+    }
+
+    toggleGodMode() {
+      this.godMode = !this.godMode; const btn = document.getElementById("godmode-toggle");
+      if(this.godMode) { btn.classList.add("godmode-active"); this.player.eq = { receiver:"r19", optic:"o19", barrel:"b19", trigger:"t19", bolt:"bl19", ammo:"a19", leg:"w20" }; this.player.credits += 250000; this.log("<span class='gold'>[DEV OVERRIDE]: OMNIPOTENT PROTOCOL ACTIVE.</span>"); } 
+      else { btn.classList.remove("godmode-active"); this.log("<span class='system'>[SYSTEM]: Constraints restored.</span>"); }
+      this.updateStats(); this.renderArmory(this.currentArmoryCat, null); this.save();
+    }
+
+    cleanWeapon() { if(this.player.credits >= 500) { this.player.credits -= 500; this.player.condition = { durability: 100.0, fouling: 0.0 }; this.updateStats(); this.save(); this.audio.playClick(); } }
+    hireSpotter() { if(this.player.credits >= 1500 && !this.player.spotterActive) { this.player.credits -= 1500; this.player.spotterActive = true; this.updateStats(); this.save(); this.audio.playClick(); } }
+
+    getItem(c, id) { return c==="leg" ? DB.legendary.find(i=>i.id===id) : (DB[c+"s"] || DB[c]).find(i=>i.id===id); }
+    getEq(c) { return this.getItem(c, this.player.eq[c]); }
+    getSpEq(c) { return DB[c].find(i=>i.id===this.player.spEq[c]); }
+
+    calcStats() {
+      if(this.godMode) return { mv:6500, bc:1.85, moa:0.0001, wt:12, db:10, wob:0.02, maxMag:75, thm:true, nv:true, pF:1.0, wF:0.1 };
+      const r = this.getEq("receiver")||DB.receivers[0], o = this.getEq("optic")||DB.optics[0], b = this.getEq("barrel")||DB.barrels[0], t = this.getEq("trigger")||DB.triggers[0], a = this.getEq("ammo")||DB.ammos[0];
+      let baseMoa = Math.max(0.01, r.moa + b.moa); if(this.player.condition.fouling > 50) baseMoa *= (1 + ((this.player.condition.fouling - 50) / 50) * 0.5);
+      const stMult = this.stance === "prone" ? 1.0 : (this.stance === "kneeling" ? 2.5 : 5.0), skRed = this.player.skills.s_lactic * 0.15;
+      return { mv: a.mv + b.mv, bc: a.bc, moa: baseMoa, wt: r.wt + o.wt + b.wt + 2.5, db: b.id==="b5" ? 120 : 158 - (this.player.skills.s_acoustic*4), wob: Math.max(0.05, (baseMoa * t.wob * stMult) - skRed), maxMag: o.mag, thm: o.thm, nv: o.nv, pF: a.pF, wF: b.wear };
+    }
+
+    calcSpotterStats() {
+      const o = this.getSpEq("s_optics")||DB.s_optics[0], l = this.getSpEq("s_lrf")||DB.s_lrf[0], p = this.getSpEq("s_pdw")||DB.s_pdw[0], d = this.getSpEq("s_drn")||DB.s_drn[0];
+      return { coneRed: o.coneRed, rngAcc: l.rngAcc, def: p.def + (this.player.skills.sp_cqc*5), bat: d.bat + (this.player.skills.sp_drone*5) };
+    }
+
+    getRepRank(r) { return r < 25 ? "Unnoticed" : (r < 50 ? "Known" : (r < 75 ? "Feared" : "Public Enemy #1")); }
+
+    updateStats() {
+      const s = this.calcStats(), sp = this.calcSpotterStats(), r = this.getEq("receiver");
+      document.getElementById("weapon-platform-name").innerText = r ? r.name : "Custom";
+      document.getElementById("stat-mv").innerText = Math.round(s.mv).toLocaleString() + " FPS"; document.getElementById("stat-bc").innerText = s.bc.toFixed(3) + " G1";
+      document.getElementById("stat-moa").innerText = s.moa.toFixed(2) + " MOA"; document.getElementById("stat-weight").innerText = s.wt.toFixed(1) + " lbs";
+      document.getElementById("stat-sound").innerText = Math.round(s.db) + " dB"; document.getElementById("stat-credits").innerText = "$" + this.player.credits.toLocaleString();
+      document.getElementById("stat-skill-points").innerText = this.player.skillPoints; document.getElementById("stat-sp-skill-points").innerText = this.player.spSkillPoints;
+      
+      document.getElementById("stat-durability").innerText = this.player.condition.durability.toFixed(1) + "%"; document.getElementById("stat-fouling").innerText = this.player.condition.fouling.toFixed(1) + "%";
+      
+      const spEl = document.getElementById("sp-active");
+      if(this.player.spotterActive) { 
+        spEl.innerText = "DEPLOYED"; 
+        spEl.style.color = "var(--cyan)"; 
+      } else { 
+        spEl.innerText = "NO"; 
+        spEl.style.color = "var(--text-dim)"; 
+      }
+      
+      document.getElementById("sp-wind").innerText = "-" + sp.coneRed + "%"; document.getElementById("sp-rng").innerText = sp.rngAcc + "%"; document.getElementById("sp-def").innerText = sp.def; document.getElementById("sp-bat").innerText = sp.bat + "m";
+
+      document.querySelectorAll(".intel-cost").forEach(el => el.innerText = this.player.spotterActive ? "$250" : "$500");
+      ["aqmar", "crescent", "vanguard", "ummah", "cyber"].forEach(f => document.getElementById("rep-" + f).innerText = this.player.rep[f] + " (" + this.getRepRank(this.player.rep[f]) + ")");
+      
+      document.getElementById("setup-pack-weight").innerText = s.wt.toFixed(1) + " lbs"; document.getElementById("setup-est-bpm").innerText = Math.round(70 + (s.wt * 2.2 * this.terrain.diff) - (this.player.skills.s_hauler * 10)) + " BPM";
+    }
+
+    showArmoryCategory(cat, btn) { 
+      document.querySelectorAll("#view-HQ .armory-selector .subtab-btn").forEach(b => b.classList.remove("active")); 
+      if(btn) btn.classList.add("active"); 
+      this.renderArmory(cat); 
+    }
+    showSpotterCategory(cat, btn) { 
+      document.querySelectorAll("#view-SPOTTER .armory-selector .subtab-btn").forEach(b => b.classList.remove("active")); 
+      if(btn) btn.classList.add("active"); 
+      this.renderSpotterArmory(cat); 
+    }
+
+    renderArmory(cat) {
+      this.currentArmoryCat = cat; const c = document.getElementById("armory-item-list"); c.innerHTML = ""; const list = cat === "legendary" ? DB.legendary : DB[cat+"s"];
+      if(!list) return;
+      list.forEach(i => {
+        const isEq = (this.player.eq[cat] === i.id) || (this.player.eq.leg === i.id); const row = document.createElement("div"); row.className = "item-row " + (isEq ? "equipped" : "");
+        let sub = "";
+        if(cat==="receiver") sub = "MOA: " + i.moa.toFixed(2) + " | Wt: " + i.wt + "lb";
+        else if(cat==="optic") sub = "Max: " + i.mag + "x";
+        else if(cat==="barrel") sub = "Vel: +" + i.mv + " | MOA: " + i.moa.toFixed(2);
+        else if(cat==="trigger") sub = "Pull: " + i.pull.toFixed(2) + " | Wobble: " + i.wob.toFixed(2) + "x";
+        else if(cat==="bolt") sub = "Cycle: " + i.cyc.toFixed(2) + "s";
+        else if(cat==="ammo") sub = "MV: " + i.mv + " | BC: " + i.bc.toFixed(3) + " | " + i.gr + "gr";
+        else sub = i.p;
+        
+        const tCls = i.tier ? "item-rarity-" + i.tier : "item-rarity-ghost";
+        row.innerHTML = "<div><span class='" + tCls + "' style='font-weight:bold;'>" + i.name + "</span><div style='font-size:10px; color:var(--text-dim); margin-top:2px;'>" + sub + "</div></div><div style='text-align:right;'><div style='color:var(--gold); font-size:11px;'>$" + i.c.toLocaleString() + "</div><button class='subtab-btn' style='margin-top:4px;'>" + (isEq ? "MOUNTED" : "EQUIP") + "</button></div>";
+        row.onclick = () => { if(cat==="legendary") { this.player.eq.leg = i.id; this.player.eq.receiver = i.r; this.player.eq.optic = i.o; this.player.eq.barrel = i.b; this.player.eq.trigger = i.t; } else { this.player.eq[cat] = i.id; this.player.eq.leg = null; } this.updateStats(); this.renderArmory(cat); this.save(); this.audio.playClick(); }; c.appendChild(row);
+      });
+    }
+
+    renderSpotterArmory(cat) {
+      const c = document.getElementById("spotter-item-list"); c.innerHTML = ""; const list = DB[cat];
+      if(!list) return;
+      list.forEach(i => {
+        const isEq = this.player.spEq[cat] === i.id; const row = document.createElement("div"); row.className = "item-row " + (isEq ? "equipped" : "");
+        let sub = "";
+        if(cat==="s_optics") sub = "Cone Reduc: -" + i.coneRed + "%";
+        else if(cat==="s_lrf") sub = "Accuracy: " + i.rngAcc + "%";
+        else if(cat==="s_thm") sub = "Resolution Tier: " + i.thmRes;
+        else if(cat==="s_wth") sub = "Weather Acc: " + i.wthAcc + "%";
+        else if(cat==="s_pdw") sub = "Defense Rating: " + i.def;
+        else sub = "Battery: " + i.bat + "m";
+        
+        const tCls = i.tier ? "item-rarity-" + i.tier : "item-rarity-ghost";
+        row.innerHTML = "<div><span class='" + tCls + "' style='font-weight:bold;'>" + i.name + "</span><div style='font-size:10px; color:var(--text-dim); margin-top:2px;'>" + sub + "</div></div><div style='text-align:right;'><div style='color:var(--gold); font-size:11px;'>$" + i.c.toLocaleString() + "</div><button class='subtab-btn' style='margin-top:4px;'>" + (isEq ? "MOUNTED" : "EQUIP") + "</button></div>";
+        row.onclick = () => { this.player.spEq[cat] = i.id; this.updateStats(); this.renderSpotterArmory(cat); this.save(); this.audio.playClick(); }; c.appendChild(row);
+      });
+    }
+
+    renderSkills() {
+      const renderBranch = (brId, htmlId, isSp) => {
+        const wrap = document.getElementById(htmlId); wrap.innerHTML = "<span style='color:var(--" + (isSp?'cyan':'neon-green') + "); font-weight:bold; margin-bottom:4px;'>" + brId.toUpperCase() + "</span>";
+        DB.skills[brId].forEach(sk => {
+          const lvl = this.player.skills[sk.id] || 0, n = document.createElement("div"); n.className = "skill-node " + (lvl>0?"unlocked":"") + " " + (lvl===sk.max?"maxed":"");
+          const disabledState = ((isSp?this.player.spSkillPoints:this.player.skillPoints)<=0 || lvl>=sk.max) ? "disabled style='opacity:0.3'" : "";
+          n.innerHTML = "<div><div style='font-weight:bold;'>" + sk.n + " [" + lvl + "/" + sk.max + "]</div><div style='font-size:9px; color:var(--text-dim); margin-top:2px;'>" + sk.d + "</div></div><button class='subtab-btn' " + disabledState + ">+1</button>";
+          n.onclick = () => { let pts = isSp ? this.player.spSkillPoints : this.player.skillPoints; if(pts > 0 && lvl < sk.max) { this.player.skills[sk.id] = lvl + 1; if(isSp) this.player.spSkillPoints--; else this.player.skillPoints--; this.renderSkills(); this.updateStats(); this.save(); this.audio.playClick(); } }; wrap.appendChild(n);
+        });
+      };
+      renderBranch("body", "skills-body", false); renderBranch("recon", "skills-recon", false); renderBranch("ballistics", "skills-ballistics", false);
+      renderBranch("sp_bal", "skills-sp-bal", true); renderBranch("sp_sur", "skills-sp-sur", true); renderBranch("sp_eva", "skills-sp-eva", true);
+    }
+
+    generateContracts() {
+      const keys = Object.keys(FACTIONS);
+      this.contracts = Array.from({length:4}, (_,i) => {
+        const f = FACTIONS[keys[Math.floor(Math.random()*keys.length)]], type = f.types[Math.floor(Math.random()*f.types.length)];
+        const dist = 500 + Math.floor(Math.random()*1500), wind = Math.floor(Math.random()*25);
+        const rewBase = dist*4, speed = (type==="vehicle" || type==="helicopter") ? 5 + Math.random()*15 : (type==="infantry"? Math.random()*2:0);
+        return { id:"c"+i, n:"Op Shadow-" + i + " // " + f.n, f:f.id, target: f.leaders[Math.floor(Math.random()*f.leaders.length)], dist:dist, wind:wind, wAng:45+Math.random()*90, temp:20+Math.floor(Math.random()*80), press:25+(Math.random()*6), type:type, speed:speed, cvr: type==="vehicle" ? "SheetMetal" : "None", rew: rewBase + (speed*150) + (this.player.rep[f.id]*20) };
+      });
+      const w = document.getElementById("intel-contract-list"); w.innerHTML = "";
+      this.contracts.forEach(c => {
+        const item = document.createElement("div"); item.className = "item-row";
+        item.innerHTML = "<div><strong style='color:var(--neon-green)'>" + c.n + "</strong><div style='font-size:10px; color:var(--text-dim); margin-top:3px;'>Target: " + c.target + " | Type: " + c.type.toUpperCase() + " | Range: " + c.dist + "m</div></div><div style='text-align:right;'><div style='color:var(--gold); font-weight:bold;'>$" + c.rew.toLocaleString() + "</div><button class='subtab-btn' style='margin-top:4px;'>SELECT</button></div>";
+        item.onclick = () => { this.mission = c; this.log("[MISSION]: Contract locked. Target: " + c.target + ". Type: " + c.type + "."); this.setPhase("SETUP"); }; w.appendChild(item);
+      });
+      if(!this.mission) this.mission = this.contracts[0];
+    }
+
+    setupProvingGrounds() { 
+      this.mission = { n:"Proving Grounds", f:"vanguard", target: "Instructor", dist: 800, wind: 10, wAng: 90, temp: 70, press: 29, type: "duel", speed: 0, cvr: "None", rew: 2500 }; 
+      this.log("<span class='cyan'>[TRAINING]: PROVING GROUNDS 1v1 DUEL INITIATED.</span>"); this.setPhase("SETUP"); 
+    }
+
+    setupTrackingDrill() {
+      this.mission = { n:"Tracking Drill", f:"vanguard", target: "Target Drone", dist: 600, wind: Math.floor(Math.random()*25), wAng: 90, temp: 70, press: 29, type: "vehicle", speed: 12 + Math.floor(Math.random()*6), cvr: "None", rew: 200 }; 
+      this.log("<span class='cyan'>[TRAINING]: LIVE-FIRE TRACKING DRILL INITIATED.</span>"); this.setPhase("SETUP"); 
+    }
+
+    buyIntel(t) {
+      const cost = this.player.spotterActive ? 250 : 500; if(this.player.credits < cost) return;
+      this.player.credits -= cost; this.updateStats(); this.audio.playClick();
+      if(t==="thermal") this.log("[INTEL]: Thermal satellite sweep active."); else this.log("[METEOROLOGY]: Wind " + this.mission.wind + "mph @ " + Math.round(this.mission.wAng) + "°. Pres: " + this.mission.press.toFixed(2) + " inHg.");
+    }
+
+    log(txt) { const out = document.getElementById("engagement-log"), out2 = document.getElementById("intel-recon-output"), entry = "<div>> " + txt + "</div>"; if(out) { out.innerHTML += entry; out.scrollTop = out.scrollHeight; } if(out2) { out2.innerHTML += entry; out2.scrollTop = out2.scrollHeight; } }
+
+    renderSetup() {
+      const w = document.getElementById("terrain-selection-grid"); w.innerHTML = "";
+      DB.terrains.forEach(t => { const r = document.createElement("div"); r.className = "item-row " + (this.terrain.id === t.id ? "equipped" : ""); r.innerHTML = "<div><strong>" + t.n + "</strong><div style='font-size:10px; color:var(--text-dim);'>" + t.desc + "</div></div>"; r.onclick = () => { this.terrain = t; this.renderSetup(); this.updateStats(); this.audio.playClick(); }; w.appendChild(r); });
+    }
+
+    setStance(s) { this.stance = s; document.querySelectorAll("#view-SETUP .item-row").forEach(e=>e.classList.remove("equipped")); document.getElementById("stance-"+s).classList.add("equipped"); this.updateStats(); this.audio.playClick(); }
+    confirmInfiltration() { const s = this.calcStats(); this.bpm = Math.max(55, Math.round(68 + (s.wt * 2.2 * this.terrain.diff) - (this.player.skills.s_hauler * 10))); this.setPhase("ENGAGEMENT"); }
+
+    calcTraj() {
+      const s = this.calcStats(), dist = this.mission ? this.mission.dist : 850, rho = (3.9228 * (this.mission?this.mission.press:29.92)) / ((this.mission?this.mission.temp:60) + 459.67), dragScale = rho / 0.0765;
+      const v0 = s.mv * 0.3048, cw = (this.mission ? this.mission.wind : 10) * 0.44704 * Math.sin((this.mission ? this.mission.wAng : 90) * Math.PI/180);
+      let dt = 0.005, t = 0, x = 0, y = 0, vx = v0, vy = 0, z = 0; const sp = [], tp = [];
+      const lat = 45 * Math.PI/180, omega = 7.2921159e-5, coriolisX = 2 * omega * v0 * Math.sin(lat); 
+      while(x < dist && t < 10) {
+        const v = Math.sqrt(vx*vx + vy*vy), drag = (0.5 * 1.225 * v * v * 0.000045 * dragScale) / s.bc;
+        vx += -drag * (vx/v) * dt; vy += (-9.80665 - drag*(vy/v)) * dt; x += vx*dt; y += vy*dt; t += dt;
+        z = cw * Math.max(0, t - (x/v0)) + (0.025 * Math.pow(t, 1.83)) + (coriolisX * t);
+        if(Math.floor(x)%50 === 0) { sp.push({x:x,y:y}); tp.push({x:x,z:z}); }
+      }
+      sp.push({x:x,y:y}); tp.push({x:x,z:z});
+      return { tof: t, vel: Math.sqrt(vx*vx+vy*vy)/0.3048, drop: Math.abs(y), drift: z, dropMil: (Math.abs(y)/dist)*1000, driftMil: (z/dist)*1000, rho:rho, sp:sp, tp:tp };
+    }
+
+    renderTraj(traj) {
+      const drawGrid = (ctx, w, h) => { ctx.clearRect(0,0,w,h); ctx.strokeStyle = "#1a2e20"; ctx.lineWidth = 1; for(let x=0; x<w; x+=45) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); } };
+      drawGrid(this.sCtx, this.sCtx.canvas.width, this.sCtx.canvas.height); this.sCtx.beginPath(); this.sCtx.strokeStyle = "var(--neon-green)"; this.sCtx.lineWidth = 2;
+      traj.sp.forEach((p,i) => { const cx = (p.x/this.mission.dist)*this.sCtx.canvas.width, cy = 10 + (Math.abs(p.y)/(traj.drop*1.2))*this.sCtx.canvas.height; if(i===0) this.sCtx.moveTo(cx,cy); else this.sCtx.lineTo(cx,cy); }); this.sCtx.stroke(); document.getElementById("telemetry-drop-val").innerText = "-" + traj.drop.toFixed(1) + "m";
+      drawGrid(this.tCtx, this.tCtx.canvas.width, this.tCtx.canvas.height); this.tCtx.beginPath(); this.tCtx.strokeStyle = "var(--warn-amber)"; this.tCtx.lineWidth = 2;
+      traj.tp.forEach((p,i) => { const cx = (p.x/this.mission.dist)*this.tCtx.canvas.width, cz = (this.tCtx.canvas.height/2) + (p.z/Math.max(2, Math.abs(traj.drift)*1.5))*(this.tCtx.canvas.height/2); if(i===0) this.tCtx.moveTo(cx,cz); else this.tCtx.lineTo(cx,cz); }); this.tCtx.stroke(); document.getElementById("telemetry-drift-val").innerText = (traj.drift>0?"+":"") + traj.drift.toFixed(1) + "m";
+    }
+
+    startEngagement() {
+      const s = this.calcStats(); this.zoom = Math.min(s.maxMag, 12);
+      this.alert = "green"; this.heat = 0; this.breath = 1.0; this.holdingBreath = false; this.bullet = null; this.spotterState.timer = 0; this.spotterState.calloutQueue = [];
+      const traj = this.calcTraj();
+      document.getElementById("hud-range").innerText = this.mission.dist + "m"; document.getElementById("hud-dope-elev").innerText = "+" + traj.dropMil.toFixed(1) + " MIL"; document.getElementById("hud-dope-wind").innerText = (traj.driftMil>0?"+":"") + traj.driftMil.toFixed(1) + " MIL"; document.getElementById("hud-density").innerText = traj.rho.toFixed(4) + " lb/ft³"; document.getElementById("hud-type").innerText = this.mission.type.toUpperCase(); document.getElementById("hud-wind").innerText = this.mission.wind + " mph"; document.getElementById("hud-stance-display").innerText = this.stance.toUpperCase();
+      this.renderTraj(traj);
+      this.target = { x: (this.c.width/2), y: (this.c.height/2) + (traj.dropMil*12), w: Math.max(14, 3000/this.mission.dist), h: Math.max(28, 6500/this.mission.dist), vx: (this.mission.speed / this.mission.dist) * 300 };
+      this.log("<span class='system'>[FIRE CONTROL]: Vantage stabilized. Ballistic CPU synced.</span>");
+      if(this.player.spotterActive) this.log("<span class='cyan'>[SPOTTER]: In position. Dope checks green.</span>");
+    }
+
+    startBreathHold() { this.holdingBreath = true; document.getElementById("btn-breath").classList.add("holding-breath"); }
+    releaseBreathHold() { this.holdingBreath = false; document.getElementById("btn-breath").classList.remove("holding-breath"); }
+    cycleZoom(d) { this.zoom = Math.max(3, Math.min(this.calcStats().maxMag, this.zoom + d)); this.audio.playClick(); }
+    toggleThermal() { if(!this.calcStats().thm && !this.godMode) { this.log("<span class='alert'>[WARN]: Optic lacks FLIR.</span>"); return; } this.thermalActive = !this.thermalActive; this.audio.playClick(); }
+
+    triggerShot() {
+      if(this.bullet) return; const s = this.calcStats(); this.audio.playShot(s.db < 125);
+      this.player.condition.durability = Math.max(0, this.player.condition.durability - (s.pF * s.wF)); this.player.condition.fouling = Math.min(100, this.player.condition.fouling + (s.pF * 1.5));
+      this.bpm = Math.min(160, this.bpm + 14); this.heat = Math.min(100, this.heat + Math.max(5, (s.db-110) + (this.stance==="prone"?28:12) - (this.player.skills.s_ghost * 10)));
+      
+      const traj = this.calcTraj(), rX = this.c.width/2, rY = this.c.height/2, tX = this.target.x + this.reticle.x + (traj.driftMil * 14), tY = this.target.y + this.reticle.y, tW = this.target.w*(this.zoom/10), tH = this.target.h*(this.zoom/10);
+      let isHit = false, lethal = false, zone = "MISS", coverStatus = "No Cover", fail = false, penVelocity = traj.vel;
+      const eqAmmo = this.getEq("ammo")||DB.ammos[0]; let KE = 0.5 * (eqAmmo.gr / 225218) * Math.pow(traj.vel, 2);
+
+      if(this.godMode) { isHit = true; lethal = true; zone = "GODMODE IMPACT"; }
+      else if(this.mission.type === "hostage") {
+        const hX = tX - tW*0.8, hY = tY + tH*0.1;
+        if(rX >= hX - tW/2 && rX <= hX + tW/2 && rY >= hY - tH/2 && rY <= hY + tH/2) { isHit = true; fail = true; zone = "CIVILIAN CASUALTY"; } 
+        else if(rX >= tX - tW/2 && rX <= tX + tW/2 && rY >= tY - tH/2 && rY <= tY + tH/2) { isHit = true; lethal = true; zone = "THORAX / UPPER"; }
+      } else if (this.mission.type === "vehicle") {
+        const eX = tX + tW*0.5, eY = tY, eW = tW*0.5, eH = tH*0.4;
+        if(rX >= eX - eW/2 && rX <= eX + eW/2 && rY >= eY - eH/2 && rY <= eY + eH/2) { isHit = true; if(KE > 4000) { lethal = true; zone = "ENGINE BLOCK (VBIED HALTED)"; } else { zone = "ENGINE BLOCK (DEFLECTED - LOW KE)"; } } 
+        else if(rX >= tX - tW*1.5 && rX <= tX + tW*1.5 && rY >= tY - tH*0.2 && rY <= tY + tH*0.4) { isHit = true; zone = "CHASSIS / NON-CRITICAL"; }
+      } else if (this.mission.type === "helicopter") {
+        const trX = tX - tW*3, trY = tY - tH*0.3, trW = tW, trH = tH*0.5;
+        if(rX >= trX - trW/2 && rX <= trX + trW/2 && rY >= trY - trH/2 && rY <= trY + trH/2) { isHit = true; lethal = true; zone = "TAIL ROTOR / FATAL SPIN"; } 
+        else if(rX >= tX - tW*2 && rX <= tX + tW*2 && rY >= tY - tH*0.4 && rY <= tY + tH*0.6) { isHit = true; zone = "FUSELAGE / DEFLECTED"; }
+      } else {
+        if(rX >= tX - tW/2 && rX <= tX + tW/2 && rY >= tY - tH/2 && rY <= tY + tH/2) { isHit = true; const relY = (rY - (tY - tH/2)) / tH; if(relY <= 0.22) { zone = "HEAD / CRANIAL"; lethal = true; } else if(relY <= 0.65) { zone = "THORAX / UPPER"; lethal = true; } else { zone = "LOWER LIMB"; } }
+      }
+
+      if(isHit && !fail) {
+        const ST = DB.coverTypes[this.mission.cvr]; if(ST > 0) { coverStatus = this.mission.cvr + " (-" + ST + " KE)"; KE -= ST; }
+        if(KE <= 0 && !this.godMode) { zone = "TRAPPED IN COVER"; lethal = false; }
+      }
+
+      this.bullet = { time:0, max: traj.tof, hit: isHit, zone:zone, lethal:lethal, fail:fail, cvr: coverStatus, traj:traj, vel: traj.vel, KE: Math.max(0, Math.round(KE)) };
+      this.log("Shot out. ToF: " + traj.tof.toFixed(3) + "s.");
+
+      if(this.player.spotterActive) {
+        const sos = 343; const soundDelay = this.mission.dist / sos;
+        const missStr = "Splash. Adjust elevation " + ((rY - tY)/10).toFixed(1) + " MIL.";
+        this.spotterState.calloutQueue.push({ time: soundDelay, msg: "<span class='cyan'>[SPOTTER]: Impact sound received. " + (isHit? (lethal? "Target down.": "Hit, non-lethal.") : missStr) + "</span>" });
+      }
+    }
+
+    loop(time) {
+      const dt = Math.min((time - this.lastFrame) / 1000, 0.1); this.lastFrame = time;
+      if(this.phase === "ENGAGEMENT") {
+        if(this.holdingBreath) { this.breath = Math.max(0, this.breath - dt*0.18); this.bpm = Math.max(48, this.bpm - dt*12); if(this.breath <= 0) { this.bpm = 135; this.holdingBreath = false; this.releaseBreathHold(); } } 
+        else { this.breath = Math.min(1.0, this.breath + dt*0.25); if(this.bpm > 68) this.bpm -= dt*8; }
+
+        let extraWobble = this.mission.type === "helicopter" ? Math.sin(time*10) * 1.5 : 0;
+        const s = this.calcStats(), wAmp = s.wob * (this.bpm/60) * (this.holdingBreath ? 0.2 : 1.0), tSec = time * 0.003;
+        this.reticle.x = (Math.sin(tSec * 2.1) * wAmp * 14) + (extraWobble * wAmp); this.reticle.y = (Math.cos(tSec * 1.7) * wAmp * 20) + (extraWobble * wAmp);
+
+        if(this.target.vx !== 0) { this.target.x += this.target.vx * dt; if(this.target.x > this.c.width + 200 || this.target.x < -200) this.target.vx *= -1; }
+
+        if(this.heat > 0) this.heat = Math.max(0, this.heat - dt*1.5);
+        this.alert = this.heat > 85 ? "red" : (this.heat > 55 ? "orange" : (this.heat > 25 ? "yellow" : "green"));
+        
+        if(this.player.spotterActive) {
+          for(let i=this.spotterState.calloutQueue.length-1; i>=0; i--) {
+            this.spotterState.calloutQueue[i].time -= dt;
+            if(this.spotterState.calloutQueue[i].time <= 0) { this.log(this.spotterState.calloutQueue[i].msg); this.spotterState.calloutQueue.splice(i, 1); }
+          }
+        }
+
+        if(this.mission.type === "duel" && this.heat > 60 && Math.random() < 0.01) { this.log("<span class='alert'>[WARNING]: INCOMING FIRE!</span>"); this.bpm += 20; this.reticle.x += 50; }
+        
+        document.getElementById("hud-bpm").innerText = Math.round(this.bpm) + " BPM"; document.getElementById("hud-breath-bar").style.width = (this.breath*100) + "%";
+        document.getElementById("hud-heat-val").innerText = Math.round(this.heat) + "%"; document.getElementById("hud-mag").innerText = this.zoom.toFixed(1) + "x";
+        document.getElementById("hud-alert-indicator").className = "alert-indicator " + this.alert; document.getElementById("hud-alert-text").innerText = this.alert.toUpperCase();
+
+        if(this.bullet) {
+          this.bullet.time += dt;
+          if(this.bullet.time >= this.bullet.max) {
+            const b = this.bullet; this.bullet = null;
+            if(b.fail) { this.log("<span class='alert'>IMPACT: " + b.zone + " [MISSION FAILED]</span>"); setTimeout(()=>this.openAAR(b), 1500); }
+            else if(b.hit && b.lethal) { this.log("<span class='gold'>IMPACT: " + b.zone + " [LETHAL]</span>"); setTimeout(()=>this.openAAR(b), 1500); }
+            else if(b.hit && !b.lethal) { this.log("<span class='warn'>IMPACT: " + b.zone + " [NON-LETHAL]</span>"); this.heat += 30; }
+            else { this.log("<span class='alert'>MISS.</span>"); this.heat += 40; }
+          }
+        }
+        this.renderScope();
+      }
+      requestAnimationFrame(t => this.loop(t));
+    }
+
+    renderScope() {
+      const w = this.c.width, h = this.c.height, cx = w/2, cy = h/2;
+      this.ctx.fillStyle = this.thermalActive ? "#020403" : "#080c0a"; this.ctx.fillRect(0,0,w,h);
+      this.ctx.fillStyle = this.thermalActive ? "#040805" : "#0d1410";
+      this.ctx.beginPath(); this.ctx.moveTo(0, cy+60); this.ctx.lineTo(w*0.5, cy+40); this.ctx.lineTo(w, cy+80); this.ctx.lineTo(w,h); this.ctx.lineTo(0,h); this.ctx.fill();
+
+      let targetVisible = !(this.mission.cvr === "Glass" && this.thermalActive);
+      if(targetVisible) {
+        const tX = this.target.x + this.reticle.x, tY = this.target.y + this.reticle.y, tW = this.target.w*(this.zoom/10), tH = this.target.h*(this.zoom/10);
+        if(this.thermalActive) { this.ctx.fillStyle = "#fff"; this.ctx.shadowColor = "var(--neon-green)"; this.ctx.shadowBlur = 10; } else { this.ctx.fillStyle = "#000"; this.ctx.shadowBlur = 0; }
+        
+        if(this.mission.type === "vehicle") {
+          this.ctx.fillRect(tX - tW*1.5, tY - tH*0.2, tW*3, tH*0.6); 
+          this.ctx.fillStyle = this.thermalActive ? "rgba(255,100,100,0.9)" : "#111"; this.ctx.fillRect(tX + tW*0.25, tY, tW*0.5, tH*0.4); 
+        } else if (this.mission.type === "helicopter") {
+          this.ctx.fillRect(tX - tW*2, tY - tH*0.4, tW*4, tH*0.6); 
+          this.ctx.fillRect(tX - tW*3, tY - tH*0.3, tW, tH*0.5); 
+          if(this.thermalActive) { this.ctx.fillStyle = "rgba(255,100,100,0.9)"; this.ctx.fillRect(tX - tW*3, tY - tH*0.3, tW, tH*0.5); } 
+        } else {
+          this.ctx.beginPath(); this.ctx.arc(tX, tY-tH*0.38, tW*0.24, 0, Math.PI*2); this.ctx.fill(); this.ctx.fillRect(tX-tW*0.35, tY-tH*0.25, tW*0.7, tH*0.5);
+          if(this.thermalActive && this.player.skills.s_anatomy > 0) { this.ctx.fillStyle = "rgba(255,42,42,0.8)"; this.ctx.beginPath(); this.ctx.arc(tX, tY-tH*0.38, tW*0.14, 0, Math.PI*2); this.ctx.arc(tX, tY-tH*0.1, tW*0.22, 0, Math.PI*2); this.ctx.fill(); }
+          if(this.mission.type === "hostage") { this.ctx.fillStyle = this.thermalActive ? "rgba(100,200,255,0.9)" : "#335577"; const hX = tX - tW*0.8, hY = tY + tH*0.1; this.ctx.beginPath(); this.ctx.arc(hX, hY-tH*0.38, tW*0.24, 0, Math.PI*2); this.ctx.fill(); this.ctx.fillRect(hX-tW*0.35, hY-tH*0.25, tW*0.7, tH*0.5); }
+          if(this.mission.type === "duel") { this.ctx.fillStyle = "#fff"; this.ctx.shadowColor = "#ffaa00"; this.ctx.shadowBlur = 20; this.ctx.beginPath(); this.ctx.arc(tX, tY, tW*0.3, 0, Math.PI*2); this.ctx.fill(); }
+        }
+        this.ctx.shadowBlur = 0;
+      }
+
+      const rad = h*0.48; this.ctx.save(); this.ctx.beginPath(); this.ctx.arc(cx,cy,rad,0,Math.PI*2,true); this.ctx.rect(0,0,w,h); this.ctx.fillStyle="#010201"; this.ctx.fill(); this.ctx.restore();
+      this.ctx.strokeStyle = this.thermalActive ? "rgba(57,255,20,0.8)" : "rgba(200,200,200,0.5)"; this.ctx.lineWidth = 1; this.ctx.beginPath(); this.ctx.arc(cx,cy,rad,0,Math.PI*2); this.ctx.stroke(); this.ctx.beginPath(); this.ctx.moveTo(cx-rad,cy); this.ctx.lineTo(cx+rad,cy); this.ctx.moveTo(cx,cy-rad); this.ctx.lineTo(cx,cy+rad); this.ctx.stroke();
+      const ms = 16 * (this.zoom/10);
+      for(let m=-10; m<=10; m++) {
+        if(m===0) continue; const px = cx + (m*ms), py = cy + (m*ms);
+        if(px>cx-rad+20 && px<cx+rad-20) { this.ctx.beginPath(); this.ctx.moveTo(px,cy-4); this.ctx.lineTo(px,cy+4); this.ctx.stroke(); }
+        if(py>cy-rad+20 && py<cy+rad-20) { this.ctx.beginPath(); this.ctx.moveTo(cx-4,py); this.ctx.lineTo(cx+4,py); this.ctx.stroke(); }
+      }
+      if(this.player.skills.s_wind > 0 || this.player.spotterActive) {
+        this.ctx.strokeStyle = "rgba(255,170,0,0.2)";
+        const spStats = this.calcSpotterStats();
+        const spread = this.player.spotterActive ? (40 * (1 - (spStats.coneRed/100))) : 40;
+        this.ctx.beginPath(); this.ctx.moveTo(cx,cy); this.ctx.lineTo(cx-spread, cy+80); this.ctx.lineTo(cx+spread, cy+80); this.ctx.closePath(); this.ctx.stroke();
+      }
+      if(this.bullet) { const prog = this.bullet.time / this.bullet.max; this.ctx.fillStyle = "#fff"; this.ctx.beginPath(); this.ctx.arc(cx, cy, 3 - (prog*2), 0, Math.PI*2); this.ctx.fill(); }
+    }
+
+    openAAR(b) {
+      this.setPhase("AAR");
+      document.getElementById("aar-outcome").innerText = b.fail ? "MISSION FAILED (CASUALTY)" : (b.lethal ? "CONFIRMED HIT [LETHAL]" : "HIT [NON-LETHAL]");
+      document.getElementById("aar-outcome").style.color = b.fail ? "var(--alert-red)" : "var(--neon-green)";
+      document.getElementById("aar-range").innerText = this.mission.dist + "m"; document.getElementById("aar-tof").innerText = b.traj.tof.toFixed(3) + "s";
+      document.getElementById("aar-impact-vel").innerText = Math.round(b.vel) + " FPS"; document.getElementById("aar-energy").innerText = b.KE + " ft-lbs";
+      document.getElementById("aar-cover").innerText = b.cvr; document.getElementById("aar-hitbox").innerText = b.zone;
+
+      let exfilLog = "Exfiltration clean. No retaliation.";
+      
+      if(b.fail) {
+        this.player.credits -= 5000;
+        document.getElementById("aar-payout").innerText = "-$5,000 (CLEANUP FINE)"; document.getElementById("aar-payout").style.color = "var(--alert-red)";
+        document.getElementById("aar-rep").innerText = "0";
+      } else if (b.lethal && this.mission.type !== "duel") {
+        const repGain = 10; this.player.rep[this.mission.f] = Math.min(100, this.player.rep[this.mission.f] + repGain);
+        const payout = Math.round(this.mission.rew * (1 + (this.player.rep[this.mission.f]/100)));
+        this.player.credits += payout; this.player.skillPoints += 1; this.player.spSkillPoints += 1;
+        document.getElementById("aar-payout").innerText = "+$" + payout.toLocaleString(); document.getElementById("aar-payout").style.color = "var(--gold)";
+        document.getElementById("aar-rep").innerText = "+" + repGain + " Notoriety"; document.getElementById("aar-xp").innerText = "+1 SP"; document.getElementById("aar-sp-xp").innerText = "+1 SP";
+        
+        if(this.heat > 80 && this.player.spotterActive) {
+          const def = this.calcSpotterStats().def;
+          if(Math.random() * 100 > def) { exfilLog = "Spotter engaged during exfil. Sustained injuries. -$1,000 Medical."; this.player.credits -= 1000; }
+          else { exfilLog = "Spotter suppressed flanking units with PDW. Clean escape."; }
+        }
+      } else {
+        this.player.credits += this.mission.rew; document.getElementById("aar-payout").innerText = "+$" + this.mission.rew.toLocaleString(); document.getElementById("aar-rep").innerText = "0";
+      }
+      
+      document.getElementById("aar-exfil-log").innerText = exfilLog;
+      this.save();
+    }
+
+    initCanvas() { this.c = document.getElementById("scopeCanvas"); this.ctx = this.c.getContext("2d"); this.sCanvas = document.getElementById("sideCanvas"); this.sCtx = this.sCanvas.getContext("2d"); this.tCanvas = document.getElementById("topCanvas"); this.tCtx = this.tCanvas.getContext("2d"); }
+    bindInputs() {
+      window.addEventListener("keydown", (e) => { if(e.code==="Space" && !e.repeat) this.startBreathHold(); }); window.addEventListener("keyup", (e) => { if(e.code==="Space") this.releaseBreathHold(); });
+      let drag = false, lx=0, ly=0; const start = (x,y) => { drag=true; lx=x; ly=y; this.audio.init(); }, move = (x,y) => { if(!drag) return; this.target.x += (x-lx)*0.5; this.target.y += (y-ly)*0.5; lx=x; ly=y; }, end = () => drag=false;
+      this.c.addEventListener("mousedown", e=>start(e.clientX,e.clientY)); window.addEventListener("mousemove", e=>move(e.clientX,e.clientY)); window.addEventListener("mouseup", end);
+      this.c.addEventListener("touchstart", e=>start(e.touches[0].clientX,e.touches[0].clientY)); window.addEventListener("touchmove", e=>move(e.touches[0].clientX,e.touches[0].clientY)); window.addEventListener("touchend", end);
+    }
+  }
+
+  window.Engine = new TacticalEngine();
+  window.addEventListener("DOMContentLoaded", () => window.Engine.init());
+  </script>
+</body>
+</html>
